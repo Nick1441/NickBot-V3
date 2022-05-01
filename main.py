@@ -129,32 +129,77 @@ async def toggleAutoVC(ctx, *args):
 @client.event
 async def on_voice_state_update(member, before, after):
     #------====== Auto Create VC ======------
-
-    VCID = discord.utils.get(client.get_all_channels(), name="CREATE ROOM")
+    with open("createroom.json", "r") as f:
+        AutoVC = json.load(f)
     
-    vc = client.get_channel(id=VCID.id)
+    
 
-    channel = client.get_channel("")
+    if AutoVC[str(member.guild.id)]['online'] == "True":
+        await member.send(after.channel.id)
+        await member.send(AutoVC[str(member.guild.id)]['defaultVC'])
+        if AutoVC[str(member.guild.id)]['defaultVC'] == str(after.channel.id):
+            VCname = member.name
+            try:
+                VCname.substr(0, 8)
+            except:
+                print()
 
-    if vc.members:
-        channel = client.get_channel(969736299974127668)
-        await channel.send("THIS WORKS?")
-        return
+            channel = await member.guild.create_voice_channel(VCname)
+
+
+            with open("OpenRooms.json", "r") as f:
+                OpenRooms = json.load(f)
+
+            open2 = {"active":channel.id}
+            try:
+                OpenRooms[str(member.guild.id)].append(open2)
+            except:
+                new = {f"[str(member.guild.id)]": {"active":channel.id}}
+                OpenRooms.append([str(member.guild.id)])
+
+            with open("OpenRooms.json", "w") as f:
+                json.dump(AutoVC, f, indent=4)
+    else:
+        await member.send("DIDNT WORK")
+
+
+
+    # VCID = discord.utils.get(client.get_all_channels(), name="CREATE ROOM")
+    
+    # vc = client.get_channel(id=VCID.id)
+
+    # channel = client.get_channel("")
+
+    # if vc.members:
+    #     channel = client.get_channel(969736299974127668)
+    #     await channel.send("THIS WORKS?")
+    #     return
 
 
 
 
 # TESTING
 @client.command()
-async def test(message):
-    with open("createroom.json", "r") as f:
-        AutoVC = json.load(f)
+async def test(ctx):
+#------====== Auto Create VC ======------
+    with open("OpenRooms.json", "r") as f:
+        OpenRooms = json.load(f)
 
-    autoJSON = {"online":"False", "defaultVC":"none"}
-    AutoVC[str(message.guild.id)] = autoJSON
+    try:
 
-    with open("createroom.json", "w") as f:
-        json.dump(AutoVC, f, indent=4)
+        OpenRooms[str(ctx.guild.id)].pop(str(ctx.channel.id))
+    except:
+        print()
+
+    try:
+        OpenRooms[str(ctx.guild.id)].update({ctx.channel.id:"test one lads"})
+    except:
+        test = str(ctx.guild.id)
+        new = {test:{"active":"Not real"}}
+        OpenRooms.update(new)
+
+    with open("OpenRooms.json", "w") as f:
+        json.dump(OpenRooms, f, indent=4)
 
 
 
