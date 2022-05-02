@@ -1,8 +1,11 @@
 
+from cmath import exp
+from unittest import expectedFailure
 import discord
 
 #Custom PY Files
-import functions
+import youtube_dl
+import os
 import config
 #import customPrefix
 
@@ -238,26 +241,92 @@ async def play(ctx, *args):
     else:
         if ctx.author.voice == None:
             await ctx.send(f"Silly Goose! You're not in a VC! <@{ctx.author.id}>")
-
-            #voiceChan = ctx.author.id
-            voiceChan = 970403994675593226
+        else:
+            song_there = os.path.isfile("song.mp3")
+            try:
+                if song_there:
+                    os.remove("song.mp3")
+            except PermissionError:
+                await ctx.send("Wait for the current playing music to end or use the 'stop' command")
+                return
+ 
+            voiceChan = ctx.author.voice.channel.id
+            #voiceChan = 970403994675593226
             
             voicechannel = client.get_channel(voiceChan)
-            
+            try:
+                await voicechannel.connect()
+            except:
+                pass
 
-            await voicechannel.connect()
             voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
 
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+                }],
+            }
+            
+            try:
+                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([str(args[0])])
+                for file in os.listdir("./"):
+                    if file.endswith(".mp3"):
+                        os.rename(file, "song.mp3")
+                voice.play(discord.FFmpegPCMAudio("song.mp3"))
 
+            except:
+                await ctx.send(f"Error Downloading. Is the Link Correct? <@{ctx.author.id}>")
+
+
+            
+@client.command()
+async def leave(ctx):
+    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
+
+    try:
+        if voice.is_connected():
+            await voice.disconnect()
         else:
-            pass  
+            ctx.send(f"Cant stop whats not playing! <@{ctx.author.id}>")
+    except:
+        pass
+
+@client.command()
+async def pause(ctx):
+    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
+
+    try:
+        if voice.is_playing():
+            await voice.pause()
+        else:
+            ctx.send(f"Nothing is Playing to pause! <@{ctx.author.id}>")
+    except:
+        pass
+
+@client.command()
+async def resume(ctx):
+    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
+
+    try:
+        if voice.is_paused():
+            await voice.resume()
+        else:
+            ctx.send(f"umm yeah, nothing is playing to resume! <@{ctx.author.id}>")
+    except:
+        pass
 
 @client.command()
 async def stop(ctx):
     voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
-    await voice.disconnect()
 
-
+    try:
+        voice.stop()
+    except:
+        pass
 
 
 
