@@ -1,4 +1,4 @@
-from ast import arg
+
 import discord
 
 #Custom PY Files
@@ -16,8 +16,10 @@ def get_prefix(client, message):
         prefixes = json.load(f)
     return prefixes[str(message.guild.id)]
 
+intents1 = discord.Intents.default()
+intents1.members = True
 
-client = commands.Bot(command_prefix = get_prefix)
+client = commands.Bot(command_prefix = get_prefix, intents=intents1)
 
 #------====== NickBot Startup ======------
 @client.event
@@ -93,9 +95,17 @@ async def changeprefix(ctx, prefix):
 async def toggleAutoVC(ctx, *args):
     if len(args) == 0 or len(args) >= 2:
         await ctx.send("AutoVC Creation has been Tured Off.")
+        with open("createroom.json", "r") as f:
+            AutoVC = json.load(f)
+
+        autoJSON = {"online":"False", "defaultVC":f"Null"}
+        AutoVC[str(ctx.guild.id)] = autoJSON
+
+        with open("createroom.json", "w") as f:
+            json.dump(AutoVC, f, indent=4)
+
     else:
         channel = ctx.guild.voice_channels
-
         found = False
 
         for i in channel:
@@ -129,38 +139,159 @@ async def toggleAutoVC(ctx, *args):
 @client.event
 async def on_voice_state_update(member, before, after):
     #------====== Auto Create VC ======------
+    #Joined Channel
+    if before.channel == None and after.channel != None:
+        await AutoCreateFunc(member, before, after)
+
+    #Swapped Channel
+    elif before.channel != None and after.channel != None:
+        #Swapped Away from Custom Channels
+        try:
+            with open("OpenRooms.json", "r") as f:
+                OpenRooms = json.load(f)
+
+            if OpenRooms[str(member.guild.id)][str(before.channel.id)]:
+                await AutoDeleteFunc(member, before, after)
+        except:
+            pass
+
+        #Swapped Into Create Room
+        try:
+            with open("createroom.json", "r") as f:
+                AutoVC = json.load(f)
+
+            if AutoVC[str(member.guild.id)]['defaultVC'] == str(after.channel.id):
+                await AutoCreateFunc(member, before, after)
+        except:
+            pass
+        
+    #User Leaves Channel
+    else:
+        await AutoDeleteFunc(member, before, after)
+
+
+#------====== Create Auto VC ======------
+async def AutoCreateFunc(member, before, after):
     with open("createroom.json", "r") as f:
         AutoVC = json.load(f)
-    
-    
 
     if AutoVC[str(member.guild.id)]['online'] == "True":
-        await member.send(after.channel.id)
-        await member.send(AutoVC[str(member.guild.id)]['defaultVC'])
         if AutoVC[str(member.guild.id)]['defaultVC'] == str(after.channel.id):
-            VCname = member.name
+            VCname = member.display_name
             try:
                 VCname.substr(0, 8)
             except:
-                print()
+                pass
 
-            channel = await member.guild.create_voice_channel(VCname)
-
+            channel2 = await member.guild.create_voice_channel(VCname)
+            await member.move_to(channel2)
 
             with open("OpenRooms.json", "r") as f:
                 OpenRooms = json.load(f)
 
-            open2 = {"active":channel.id}
             try:
-                OpenRooms[str(member.guild.id)].append(open2)
+                OpenRooms[str(member.guild.id)].pop(str(channel2.id))
+                OpenRooms[str(member.guild.id)].update({str(channel2.id):"Null"})
             except:
-                new = {f"[str(member.guild.id)]": {"active":channel.id}}
-                OpenRooms.append([str(member.guild.id)])
+                guildID = str(member.guild.id)
+                data = {guildID:{str(after.channel.id):"Null"}}
+                OpenRooms.update(data)
 
             with open("OpenRooms.json", "w") as f:
-                json.dump(AutoVC, f, indent=4)
+                json.dump(OpenRooms, f, indent=4)
+
+#------====== Delete Auto VC ======------
+async def AutoDeleteFunc(member, before, after):
+    if before.channel:
+        with open("OpenRooms.json", "r") as f:
+            OpenRooms = json.load(f)
+
+        try:
+            if str(before.channel.id) in OpenRooms[str(member.guild.id)]:
+                id = before.channel.id
+                channel = member.guild.voice_channels
+
+                for i in channel:
+                    if str(i.id) == str(id): 
+                        await i.delete()
+
+                        #Delete JSON here
+                        with open("OpenRooms.json", "r") as f:
+                            OpenRooms = json.load(f)
+                        
+                        OpenRooms[str(member.guild.id)].pop(str(i.id))
+                        
+                        if OpenRooms[str(member.guild.id)] == {}:
+                            OpenRooms.pop(str(member.guild.id))
+
+                        with open("OpenRooms.json", "w") as f:
+                            json.dump(OpenRooms, f, indent=4)
+        except:
+            pass
+
+
+#------====== Simple Music Bot ======------
+@client.command()
+async def play(ctx, *args):
+    if len(args) == 0 or len(args) >= 2:
+        await ctx.send(f"Invalid Input for Play <@{ctx.author.id}>")
     else:
-        await member.send("DIDNT WORK")
+        if ctx.author.voice == None:
+            await ctx.send(f"Silly Goose! You're not in a VC! <@{ctx.author.id}>")
+
+            #voiceChan = ctx.author.id
+            voiceChan = 970403994675593226
+            
+            voicechannel = client.get_channel(voiceChan)
+            
+
+            await voicechannel.connect()
+            voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
+
+
+        else:
+            pass  
+
+@client.command()
+async def stop(ctx):
+    voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
+    await voice.disconnect()
+
+
+
+
+
+###         
+            # server = client.get_guild(ctx.author.guild.id)
+            # member = server.guild_members
+            # await ctx.send(str(member))
+            # user = None
+            # for i in users:
+            #     #await ctx.send(f"{i.id} -- {ctx.author.id}")
+            #     if i.id == ctx.author.id:
+            #         user = i
+            #         await ctx.send(user)
+
+###
+        #else:
+
+            
+            #voiceChan = ctx.author.voice.channel.id
+
+
+            #voiceChannel = discord.utils.get(ctx.guild.voice_channels, name=str(ctx.author.voice.channel.id))
+            #voice = discord.utils.get(client.voice_clients, guild=ctx.guild)
+
+            
+
+
+
+
+    #Check to See if other Users are in the channel
+    #To Do
+    #When user leaves, check against json, if it is. remove it
+    #Remove Channels. Remove from JSON.
+    #Check to see if other users are there first??
 
 
 
